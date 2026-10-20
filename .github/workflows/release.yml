@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build release assets
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ github.ref_name }}
+      version_code: ${{ github.run_number }}
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download PBW
+        uses: actions/download-artifact@v4
+        with:
+          name: watchapp-pbw
+          path: release
+
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-debug-apk
+          path: release
+
+      - name: Prepare release assets
+        run: |
+          set -eu
+          VERSION="${GITHUB_REF_NAME}"
+          mv release/watchapp.pbw "release/ScreenMirror-${VERSION}.pbw"
+          mv release/app-debug.apk "release/PebbleMirror-${VERSION}-debug.apk"
+          cd release
+          sha256sum ./*.apk ./*.pbw > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          name: Pebble Screen Mirror ${{ github.ref_name }}
+          body: |
+            ## Pebble Screen Mirror ${{ github.ref_name }}
+
+            Android 手机屏幕镜像到 Pebble Time 2（emery），并支持从手表反向操作手机。
+
+            ### 下载
+
+            - `PebbleMirror-${{ github.ref_name }}-debug.apk`：Android 端（debug 签名，可直接侧载）
+            - `ScreenMirror-${{ github.ref_name }}.pbw`：Pebble 端
+            - `SHA256SUMS.txt`：文件校验
+
+            ```powershell
+            adb install -r PebbleMirror-${{ github.ref_name }}-debug.apk
+            ```
+
+            ```bash
+            pebble install --adb <设备序列号> ScreenMirror-${{ github.ref_name }}.pbw
+            ```
+
+            使用前请确认官方 Pebble 应用（`coredevices.coreapp`）已安装并开启
+            Legacy PebbleKit。完整说明见仓库 README。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

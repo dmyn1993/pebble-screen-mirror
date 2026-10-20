@@ -1,0 +1,116 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: Version label (vX.Y.Z or dev)
+        required: false
+        type: string
+        default: "0.0.0-dev"
+      version_code:
+        description: Android versionCode
+        required: false
+        type: string
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  watchapp:
+    name: Build watchapp (emery)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache Pebble SDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.pebble-sdk
+          key: pebble-sdk-4.33.1-v1
+
+      - name: Install pebble-tool
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pebble-tool==5.0.40"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install / activate SDK
+        run: |
+          if [ ! -d "$HOME/.pebble-sdk/SDKs/4.33.1" ]; then
+            pebble sdk install 4.33.1
+          fi
+          pebble sdk activate 4.33.1
+          pebble --version
+
+      - name: Set PBW version from tag
+        working-directory: watchapp
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then VERSION="0.0.0-dev"; fi
+          VERSION="${VERSION#v}"
+          if [ "$VERSION" != "0.0.0-dev" ]; then
+            python -c 'import json,sys; p="package.json"; d=json.load(open(p,encoding="utf-8")); d["version"]=sys.argv[1]; f=open(p,"w",encoding="utf-8"); json.dump(d,f,ensure_ascii=False,indent=2); f.write("\n"); f.close()' "$VERSION"
+          fi
+          grep '"version"' package.json
+
+      - name: Build PBW
+        working-directory: watchapp
+        run: |
+          pebble build
+          ls -l build/watchapp.pbw
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: watchapp-pbw
+          path: watchapp/build/watchapp.pbw
+          if-no-files-found: error
+
+  android:
+    name: Build Android APK + tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build, test and lint
+        working-directory: android-app
+        run: |
+          chmod +x gradlew
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then VERSION="0.0.0-dev"; fi
+          VERSION="${VERSION#v}"
+          VERSION_CODE="${{ inputs.version_code }}"
+          if [ -z "$VERSION_CODE" ]; then VERSION_CODE="1"; fi
+          ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug \
+            --no-daemon -PversionName="$VERSION" -PversionCode="$VERSION_CODE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

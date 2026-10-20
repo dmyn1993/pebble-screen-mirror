@@ -1,0 +1,27 @@
+# Build outputs
+watchapp/build/
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+*.iml
+.idea/
+
+# Test captures (committed screenshots live in docs/images)
+watchapp/screenshot_*.png
+watchapp/test_*.bin
+watchapp/test_*.png
+
+# Reference checkouts, local backups and local metadata
+third_party/
+BACKUP_INFO.txt
+*.zip
+*.sha256.txt
+dist/*.apk
+dist/*.pbw
+.DS_Store
+
+# Local signing material
+*.jks
+*.keystore
+!android-app/ci/debug.keystore

@@ -1,0 +1,31 @@
+{
+  "name": "pebble-screen-mirror",
+  "author": "Pebble Mirror",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "Screen Mirror",
+    "uuid": "be518248-51cb-4b4f-aa58-8c4718411da5",
+    "sdkVersion": "3",
+    "targetPlatforms": [
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "resources": {
+      "media": [
+        {
+          "type": "png",
+          "name": "IMAGE_MENU_ICON",
+          "file": "images/menu_icon.png",
+          "menuIcon": true
+        }
+      ]
+    }
+  }
+}

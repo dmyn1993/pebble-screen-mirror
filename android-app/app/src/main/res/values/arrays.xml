@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="mode_labels">
+        <item>@string/mode_viewport</item>
+        <item>@string/mode_fit</item>
+    </string-array>
+    <string-array name="dither_labels">
+        <item>@string/dither_atkinson</item>
+        <item>@string/dither_threshold</item>
+    </string-array>
+    <string-array name="fps_labels">
+        <item>@string/fps_1</item>
+        <item>@string/fps_2</item>
+        <item>@string/fps_3</item>
+        <item>@string/fps_5</item>
+    </string-array>
+    <string-array name="injector_labels">
+        <item>@string/injector_auto</item>
+        <item>@string/injector_accessibility</item>
+        <item>@string/injector_shizuku</item>
+        <item>@string/injector_root</item>
+    </string-array>
+</resources>
