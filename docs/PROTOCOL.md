@@ -40,6 +40,16 @@ watchapp 与 Android 伴侣应用通过 **AppMessage** 通信，中间由官方 
 | 13 | `KEY` | `CMD` | 1=返回, 2=主页, 3=最近任务 |
 | 14 | `REQUEST` | `CMD` | `CMD=1` 请求关键帧 |
 | 15 | `PATH` | `POINT_COUNT`, `DURATION`, `DATA` | 完整触摸折线；`DATA` 为 `count` 个 `uint16 x, uint16 y`（小端） |
+| 16 | `MODE` | `CMD` | 请求切换取景：0=竖屏视口，1=整屏缩放（长按 Select） |
+
+### 按键映射
+
+- 上/下短按：`PAN` 步进 24；
+- 长按上/下：`PAN` 到 0 / `MAX_OFF`（仅竖屏视口模式）；
+- Select 单击：`KEY` `CMD=2`（Android 主页）；
+- Select 双击：`KEY` `CMD=3`（最近任务）；
+- Select 长按：`MODE` 切换 0/1；
+- 返回：`KEY` `CMD=1`。
 
 ### 手机 → 表
 
@@ -53,6 +63,10 @@ watchapp 与 Android 伴侣应用通过 **AppMessage** 通信，中间由官方 
 
 - bit0 `FINAL`：本帧最后一块，手表把 staging 位图复制到显示位图并重绘。
 - bit1 `KEYFRAME`：本帧是关键帧，手表清空 staging 后应用所有 tile。
+
+`STATUS` 的 `FLAGS` bit0 变成 0 时，手表清空最后一帧并回到启动页。手机停止镜像时
+会在关闭 `LegacyPebbleLink` 之前直接广播一次 `STATUS(flags=0)`，避免队列清空
+导致这条消息丢失；正常心跳仍走带 ACK 的队列。
 
 ## 3. 帧与 tile
 

@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.projection.MediaProjectionConfig;
 import android.media.projection.MediaProjectionManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -47,6 +48,7 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
     private MaterialButton startButton;
     private MaterialButton accessibilityButton;
     private MaterialButton shizukuButton;
+    private MaterialButton writeSettingsButton;
 
     private Spinner modeSpinner;
     private Spinner ditherSpinner;
@@ -78,6 +80,7 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
         startButton = findViewById(R.id.button_start_stop);
         accessibilityButton = findViewById(R.id.button_accessibility);
         shizukuButton = findViewById(R.id.button_shizuku);
+        writeSettingsButton = findViewById(R.id.button_write_settings);
 
         modeSpinner = findViewById(R.id.spinner_mode);
         ditherSpinner = findViewById(R.id.spinner_dither);
@@ -223,6 +226,20 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
             LegacyPebbleLink.launchWatchapp(this, MirrorController.WATCHAPP_UUID);
             Toast.makeText(this, R.string.watchapp_launch_sent, Toast.LENGTH_SHORT).show();
         });
+
+        writeSettingsButton.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Throwable t) {
+                try {
+                    startActivity(new Intent(Settings.ACTION_SETTINGS));
+                } catch (Throwable ignored) {
+                    Toast.makeText(this, R.string.allow_write_settings,
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+        });
     }
 
     private void beginMirroring() {
@@ -307,6 +324,18 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
         if (isFinishing()) {
             return;
         }
+        if (modeSpinner != null && !updatingSpinners
+                && modeSpinner.getSelectedItemPosition() != settings.getMode()) {
+            updatingSpinners = true;
+            modeSpinner.setSelection(settings.getMode(), false);
+            updatingSpinners = false;
+        }
+
+        boolean canWriteSettings = ScreenTimeoutManager.canWrite(this);
+        if (writeSettingsButton != null) {
+            writeSettingsButton.setVisibility(canWriteSettings ? View.GONE : View.VISIBLE);
+        }
+
         statusMirroring.setText(controller.isMirroring()
                 ? R.string.status_mirroring_on : R.string.status_mirroring_off);
         statusWatch.setText(controller.isWatchOpen()
@@ -314,9 +343,15 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
         statusInjector.setText(getString(R.string.status_injector,
                 controller.getInjectorDescription()));
 
-        String detail = controller.getStatusText();
-        statusHint.setText(detail == null || detail.isEmpty()
-                ? getString(R.string.status_hint) : detail);
+        if (!canWriteSettings && controller.isMirroring()) {
+            statusHint.setText(R.string.keep_awake_denied);
+        } else if (!TouchIndicatorManager.isAvailable() && controller.isMirroring()) {
+            statusHint.setText(R.string.touch_indicator_unavailable);
+        } else {
+            String detail = controller.getStatusText();
+            statusHint.setText(detail == null || detail.isEmpty()
+                    ? getString(R.string.status_hint) : detail);
+        }
         startButton.setText(controller.isMirroring()
                 ? R.string.stop_mirroring : R.string.start_mirroring);
 

@@ -2,8 +2,8 @@ plugins {
     id 'com.android.application'
 }
 
-def appVersionCode = (project.findProperty('versionCode') ?: '1').toString().toInteger()
-def appVersionName = (project.findProperty('versionName') ?: '1.0.0').toString()
+def appVersionCode = (project.findProperty('versionCode') ?: '2').toString().toInteger()
+def appVersionName = (project.findProperty('versionName') ?: '1.1.0').toString()
 
 android {
     namespace 'com.pebblemirror.companion'

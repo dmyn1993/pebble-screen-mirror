@@ -44,6 +44,8 @@ public final class MirrorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        ScreenTimeoutManager.begin(this);
+        TouchIndicatorManager.begin(this);
         NotificationHelper.ensureChannel(this);
         controller = MirrorController.get();
         controller.setCaptureErrorListener(this::stopSelf);
@@ -144,6 +146,12 @@ public final class MirrorService extends Service {
 
     @Override
     public void onDestroy() {
+        TouchIndicatorManager.end(this);
+        ScreenTimeoutManager.end(this);
+        // Tell the watch immediately; the normal queued status would be dropped
+        // when LegacyPebbleLink.close() clears its queue below.
+        LegacyPebbleLink.sendStatusNow(this, MirrorController.WATCHAPP_UUID,
+                false, "Start on phone");
         if (capture != null) {
             capture.stop();
             capture = null;

@@ -28,12 +28,16 @@ python tools/send_test_frame.py --pebble /opt/pebble-venv/bin/pebble
 
 - **Touchscreen**: tap / swipe / free-form circle or S; the complete polyline
   is replayed on the phone when the finger lifts.
-- **UP / DOWN**: pan the viewport in viewport mode.
-- **SELECT**: tap the center of the viewport.
+- **UP / DOWN**: short press pans the viewport; long UP jumps to the top and long
+  DOWN jumps to the bottom (viewport mode).
+- **SELECT**: Android Home.
 - **Double SELECT**: Android Recents.
-- **Long SELECT**: Android Home.
+- **Long SELECT**: toggle viewport/fit mode.
 - **BACK**: Android Back.
 - **Long BACK**: exit the watchapp (system behavior).
+
+When the phone stops mirroring (or the connection times out), the app clears the
+last frame and returns to its splash screen.
 
 ## Icon
 

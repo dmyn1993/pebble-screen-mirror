@@ -41,6 +41,7 @@ public final class WatchProtocol {
     public static final int KIND_KEY = 13;
     public static final int KIND_REQUEST = 14;
     public static final int KIND_PATH = 15;
+    public static final int KIND_MODE = 16;
     public static final int KIND_DEBUG = 99;
 
     public static final int FRAME_FINAL = 1;

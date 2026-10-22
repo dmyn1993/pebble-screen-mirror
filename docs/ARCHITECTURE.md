@@ -13,9 +13,11 @@
 - `touch_service_subscribe()` 获取原始触摸；只在 window appear/disappear 期间
   订阅，退出时退订。
 - 每 3 秒的 `AppTimer` 做两件事：连接超时检测、每 6 秒发 `HELLO`。
-- 按键：上/下平移视口，Select 点击中心，双击 Select 最近任务，长按 Select 主页，
-  返回键发送 Android 返回，长按返回键由系统退出 watchapp。
-
+- 按键：上/下短按平移视口，长按上/下跳到视口顶/底；Select 单击 Android 主页，
+  双击最近任务，长按切换竖屏视口/整屏缩放；返回键发送 Android 返回，
+  长按返回键由系统退出 watchapp。
+- 手机停止镜像时发送 `STATUS(flags=0)`，手表清空最后一帧并回到启动页；
+  连接超时也会回到启动页。
 ### Android 伴侣应用（`android-app`，纯 Java）
 
 | 类 | 职责 |
@@ -23,6 +25,8 @@
 | `MirrorApp` | 初始化 `MirrorController`、通知渠道、Root 探测 |
 | `MainActivity` | 录屏授权、状态、设置、Shizuku/无障碍入口 |
 | `MirrorService` | 前台服务；持有 MediaProjection、`ScreenCapture`、`LegacyPebbleLink` |
+| `ScreenTimeoutManager` | 镜像时临时把系统息屏时间设为“永不”，停止/异常退出后恢复原值 |
+| `TouchIndicatorManager` | 镜像时通过 Shizuku/Root 打开系统触摸小白点，停止后恢复原值 |
 | `ScreenCapture` | VirtualDisplay + ImageReader；缩放；回调 ARGB 像素 |
 | `FrameEncoder` | 1-bit 抖动、LSB-first 打包、8×8 tile、帧差分 |
 | `ViewportMapper` | 视口/整屏几何、触摸坐标映射 |

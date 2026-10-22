@@ -42,6 +42,7 @@ enum {
   KIND_KEY = 13,
   KIND_REQUEST = 14,
   KIND_PATH = 15,
+  KIND_MODE = 16,
 };
 
 enum {
@@ -388,6 +389,17 @@ static void send_key(uint8_t key) {
   app_message_outbox_send();
 }
 
+static void send_mode(uint8_t mode) {
+  DictionaryIterator *iter;
+  if (app_message_outbox_begin(&iter) != APP_MSG_OK) {
+    return;
+  }
+
+  dict_write_uint8(iter, MK_KIND, KIND_MODE);
+  dict_write_uint8(iter, MK_CMD, mode);
+  app_message_outbox_send();
+}
+
 static void request_keyframe(void) {
   DictionaryIterator *iter;
   if (app_message_outbox_begin(&iter) != APP_MSG_OK) {
@@ -414,6 +426,31 @@ static void touch_retry_callback(void *data) {
 // ---------------------------------------------------------------------------
 // Incoming messages
 // ---------------------------------------------------------------------------
+
+static void reset_to_splash(void) {
+  s_have_frame = false;
+  s_frame_open = false;
+  s_frame_id = 0;
+  s_last_frame_id = 0;
+  s_view_off = 0;
+  s_touch_active = false;
+  s_pending_touch = false;
+  s_pending_path = false;
+  s_path_count = 0;
+
+  if (s_touch_retry_timer) {
+    app_timer_cancel(s_touch_retry_timer);
+    s_touch_retry_timer = NULL;
+  }
+  if (s_path_retry_timer) {
+    app_timer_cancel(s_path_retry_timer);
+    s_path_retry_timer = NULL;
+  }
+
+  if (s_canvas) {
+    layer_mark_dirty(s_canvas);
+  }
+}
 
 static void handle_config(DictionaryIterator *iter) {
   int width = tuple_int(iter, MK_WIDTH, s_width);
@@ -447,7 +484,11 @@ static void handle_config(DictionaryIterator *iter) {
 
   APP_LOG(APP_LOG_LEVEL_INFO, "CONFIG %dx%d max_off=%d mode=%d flags=%d",
           s_width, s_height, s_max_off, s_mode, flags);
-  layer_mark_dirty(s_canvas);
+  if (!s_mirroring && s_have_frame) {
+    reset_to_splash();
+  } else {
+    layer_mark_dirty(s_canvas);
+  }
 
   if (s_mirroring) {
     request_keyframe();
@@ -468,7 +509,9 @@ static void handle_status(DictionaryIterator *iter) {
   s_mirroring = (flags & 1) != 0;
   copy_status_text(text ? text->value->cstring : NULL);
 
-  if (!was_connected || was_mirroring != s_mirroring
+  if (!s_mirroring && s_have_frame) {
+    reset_to_splash();
+  } else if (!was_connected || was_mirroring != s_mirroring
       || strcmp(old_status, s_status_text) != 0) {
     layer_mark_dirty(s_canvas);
   }
@@ -649,24 +692,28 @@ static void touch_handler(const TouchEvent *event, void *context) {
 // Buttons
 // ---------------------------------------------------------------------------
 
-static void pan_by(int delta) {
+static void pan_to(int offset) {
   if (!s_have_frame || s_mode != MODE_VIEWPORT || s_max_off <= 0) {
     return;
   }
 
   int old_offset = s_view_off;
-  s_view_off += delta;
-  if (s_view_off < 0) {
-    s_view_off = 0;
+  if (offset < 0) {
+    offset = 0;
   }
-  if (s_view_off > s_max_off) {
-    s_view_off = s_max_off;
+  if (offset > s_max_off) {
+    offset = s_max_off;
   }
+  s_view_off = offset;
 
   if (s_view_off != old_offset) {
     send_pan(s_view_off);
     layer_mark_dirty(s_canvas);
   }
+}
+
+static void pan_by(int delta) {
+  pan_to(s_view_off + delta);
 }
 
 static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
@@ -677,12 +724,23 @@ static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
   pan_by(PAN_STEP);
 }
 
+static void up_long_click_handler(ClickRecognizerRef recognizer, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "long UP: viewport top");
+  pan_to(0);
+}
+
+static void down_long_click_handler(ClickRecognizerRef recognizer, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "long DOWN: viewport bottom");
+  pan_to(s_max_off);
+}
+
 static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "SELECT: home");
   if (!s_connected || !s_have_frame) {
     send_hello();
     return;
   }
-  send_touch(TOUCH_TAP, s_width / 2, s_height / 2);
+  send_key(KEY_HOME);
 }
 
 static void select_double_click_handler(ClickRecognizerRef recognizer, void *context) {
@@ -692,8 +750,9 @@ static void select_double_click_handler(ClickRecognizerRef recognizer, void *con
 }
 
 static void select_long_click_handler(ClickRecognizerRef recognizer, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "long SELECT: toggle mode");
   if (s_connected) {
-    send_key(KEY_HOME);
+    send_mode(s_mode == MODE_VIEWPORT ? MODE_FIT : MODE_VIEWPORT);
   }
 }
 
@@ -708,6 +767,8 @@ static void back_click_handler(ClickRecognizerRef recognizer, void *context) {
 static void click_config_provider(void *context) {
   window_single_repeating_click_subscribe(BUTTON_ID_UP, 90, up_click_handler);
   window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 90, down_click_handler);
+  window_long_click_subscribe(BUTTON_ID_UP, 600, up_long_click_handler, NULL);
+  window_long_click_subscribe(BUTTON_ID_DOWN, 600, down_long_click_handler, NULL);
 
   window_single_click_subscribe(BUTTON_ID_SELECT, select_click_handler);
   window_multi_click_subscribe(BUTTON_ID_SELECT, 2, 2, 300, true,
@@ -745,11 +806,11 @@ static void draw_splash(GContext *ctx, GRect bounds) {
   }
 
   draw_centered(ctx, "Open Pebble Mirror on your phone,\nthen start mirroring.",
-                GRect(10, 136, w - 20, 38), s_font_small,
+                GRect(10, 128, w - 20, 36), s_font_small,
                 GTextOverflowModeWordWrap);
 
-  draw_centered(ctx, "UP/DOWN: pan\nSELECT: tap\nBACK: back",
-                GRect(10, 176, w - 20, 46), s_font_small,
+  draw_centered(ctx, "UP/DOWN: pan\nhold: top/bottom\nSELECT: home\nhold: mode",
+                GRect(8, 164, w - 16, 58), s_font_small,
                 GTextOverflowModeWordWrap);
 
   (void)h;
@@ -814,7 +875,11 @@ static void timeout_callback(void *data) {
   if (s_connected && now_ms() - s_last_rx_ms > CONNECTION_TIMEOUT_MS) {
     s_connected = false;
     s_mirroring = false;
-    layer_mark_dirty(s_canvas);
+    if (s_have_frame) {
+      reset_to_splash();
+    } else {
+      layer_mark_dirty(s_canvas);
+    }
   }
 
   // Announce ourselves periodically so a phone app started after the watchapp

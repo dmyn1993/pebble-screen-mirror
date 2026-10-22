@@ -306,6 +306,10 @@ public final class MirrorController {
                 case WatchProtocol.KIND_PATH:
                     handleWatchPath(message);
                     break;
+                case WatchProtocol.KIND_MODE:
+                    handleWatchMode(WatchProtocol.intValue(
+                            message, WatchProtocol.KEY_CMD, -1));
+                    break;
                 case WatchProtocol.KIND_REQUEST:
                     forceKeyframe = true;
                     if (hasLatestFrame()) {
@@ -434,6 +438,21 @@ public final class MirrorController {
                     + point[0] + "," + point[1]);
             injectLongPress(point[0], point[1]);
         }
+    }
+
+    private void handleWatchMode(int requested) {
+        if (requested != WatchProtocol.MODE_VIEWPORT
+                && requested != WatchProtocol.MODE_FIT) {
+            return;
+        }
+        if (settings.getMode() == requested) {
+            return;
+        }
+        Log.i(TAG, "watch mode -> " + requested);
+        settings.setMode(requested);
+        settings.save(appContext);
+        setSettings(settings);
+        sendStatus();
     }
 
     private void handleWatchPath(Map<Integer, WatchValue> message) {

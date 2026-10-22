@@ -86,6 +86,25 @@ public final class LegacyPebbleLink implements AutoCloseable {
         }
     }
 
+    /**
+     * Send a status frame directly, without the ACK queue. Used when the service
+     * is shutting down and its queued messages would be discarded by close().
+     */
+    public static void sendStatusNow(Context context, UUID watchappUuid,
+                                     boolean mirroring, String text) {
+        try {
+            String json = encodeJson(WatchProtocol.status(mirroring, text));
+            Intent intent = new Intent(ACTION_SEND)
+                    .setPackage(PEBBLE_APP_PACKAGE)
+                    .putExtra(EXTRA_UUID, watchappUuid)
+                    .putExtra(EXTRA_TRANSACTION_ID, 250)
+                    .putExtra(EXTRA_MSG_DATA, json);
+            context.sendBroadcast(intent);
+        } catch (Throwable t) {
+            Log.w(TAG, "Unable to send direct status", t);
+        }
+    }
+
     private interface Job {
         void run(JobCallback callback);
     }
