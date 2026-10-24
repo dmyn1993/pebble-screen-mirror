@@ -188,6 +188,7 @@ public final class MirrorController {
         runOnMain(() -> {
             capture = newCapture;
             mirroring = true;
+            resetTouchTrail();
             statusText = "镜像运行中";
             watchStatus = "Mirroring";
             forceKeyframe = true;
@@ -212,6 +213,7 @@ public final class MirrorController {
         runOnMain(() -> {
             capture = null;
             mirroring = false;
+            resetTouchTrail();
             frameDirty = false;
             forceKeyframe = true;
             statusText = "镜像已停止";
@@ -226,6 +228,7 @@ public final class MirrorController {
             Log.w(TAG, "capture error: " + message);
             capture = null;
             mirroring = false;
+            resetTouchTrail();
             frameDirty = false;
             forceKeyframe = true;
             statusText = message;
@@ -309,6 +312,12 @@ public final class MirrorController {
                 case WatchProtocol.KIND_MODE:
                     handleWatchMode(WatchProtocol.intValue(
                             message, WatchProtocol.KEY_CMD, -1));
+                    break;
+                case WatchProtocol.KIND_PREVIEW:
+                    handleWatchPreview(
+                            WatchProtocol.intValue(message, WatchProtocol.KEY_CMD, 0),
+                            WatchProtocol.intValue(message, WatchProtocol.KEY_X, 0),
+                            WatchProtocol.intValue(message, WatchProtocol.KEY_Y, 0));
                     break;
                 case WatchProtocol.KIND_REQUEST:
                     forceKeyframe = true;
@@ -415,13 +424,17 @@ public final class MirrorController {
         if (command == WatchProtocol.TOUCH_DOWN) {
             int[] point = mapToPhone(watchX, watchY);
             touchGesture.down(point[0], point[1], now);
+            TouchTrailOverlay.clear();
+            TouchTrailOverlay.add(point[0], point[1]);
         } else if (command == WatchProtocol.TOUCH_MOVE) {
             int[] point = mapToPhone(watchX, watchY);
             touchGesture.move(point[0], point[1]);
+            TouchTrailOverlay.add(point[0], point[1]);
         } else if (command == WatchProtocol.TOUCH_UP) {
             int[] point = mapToPhone(watchX, watchY);
             TouchGesture.Result result = touchGesture.up(
                     point[0], point[1], now, durationMs);
+            TouchTrailOverlay.add(point[0], point[1]);
             injectGesture(result);
         } else if (command == WatchProtocol.TOUCH_TAP) {
             // A quick tap already sent TOUCH_DOWN; discard that pending
@@ -430,14 +443,33 @@ public final class MirrorController {
             int[] point = mapToPhone(watchX, watchY);
             Log.i(TAG, "watch tap " + watchX + "," + watchY + " -> phone "
                     + point[0] + "," + point[1]);
+            TouchTrailOverlay.clear();
+            TouchTrailOverlay.add(point[0], point[1]);
             injectTap(point[0], point[1]);
         } else if (command == WatchProtocol.TOUCH_LONG) {
             touchGesture.reset();
             int[] point = mapToPhone(watchX, watchY);
             Log.i(TAG, "watch long " + watchX + "," + watchY + " -> phone "
                     + point[0] + "," + point[1]);
+            TouchTrailOverlay.clear();
+            TouchTrailOverlay.add(point[0], point[1]);
             injectLongPress(point[0], point[1]);
         }
+    }
+
+    private void resetTouchTrail() {
+        TouchTrailOverlay.clear();
+    }
+
+    private void handleWatchPreview(int command, int watchX, int watchY) {
+        if (phoneWidth <= 0 || phoneHeight <= 0) {
+            return;
+        }
+        int[] point = mapToPhone(watchX, watchY);
+        if (command == WatchProtocol.TOUCH_DOWN) {
+            TouchTrailOverlay.clear();
+        }
+        TouchTrailOverlay.add(point[0], point[1]);
     }
 
     private void handleWatchMode(int requested) {
@@ -481,6 +513,11 @@ public final class MirrorController {
         }
         if (points.size() < 2) {
             return;
+        }
+
+        TouchTrailOverlay.clear();
+        for (int[] point : points) {
+            TouchTrailOverlay.add(point[0], point[1]);
         }
 
         touchGesture.reset();
@@ -603,6 +640,11 @@ public final class MirrorController {
                 watchWidth, watchHeight, mode);
         maxOffset = geometry.maxOffset;
         viewportOffset = ViewportMapper.clampOffset(viewportOffset, maxOffset);
+
+        if (TouchOverlayController.isShowing()) {
+            TouchTrailOverlay.eraseFromFrame(pixels, scaledWidth, scaledHeight,
+                    phoneW, phoneH);
+        }
 
         final FrameEncoder.TileFrame frame;
         try {

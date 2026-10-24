@@ -49,6 +49,7 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
     private MaterialButton accessibilityButton;
     private MaterialButton shizukuButton;
     private MaterialButton writeSettingsButton;
+    private MaterialButton overlaySettingsButton;
 
     private Spinner modeSpinner;
     private Spinner ditherSpinner;
@@ -81,6 +82,7 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
         accessibilityButton = findViewById(R.id.button_accessibility);
         shizukuButton = findViewById(R.id.button_shizuku);
         writeSettingsButton = findViewById(R.id.button_write_settings);
+        overlaySettingsButton = findViewById(R.id.button_overlay_settings);
 
         modeSpinner = findViewById(R.id.spinner_mode);
         ditherSpinner = findViewById(R.id.spinner_dither);
@@ -240,6 +242,20 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
                 }
             }
         });
+
+        overlaySettingsButton.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Throwable t) {
+                try {
+                    startActivity(new Intent(Settings.ACTION_SETTINGS));
+                } catch (Throwable ignored) {
+                    Toast.makeText(this, R.string.allow_overlay,
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+        });
     }
 
     private void beginMirroring() {
@@ -335,6 +351,13 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
         if (writeSettingsButton != null) {
             writeSettingsButton.setVisibility(canWriteSettings ? View.GONE : View.VISIBLE);
         }
+        boolean canShowOverlay = TouchOverlayController.canShow(this);
+        if (overlaySettingsButton != null) {
+            overlaySettingsButton.setVisibility(canShowOverlay ? View.GONE : View.VISIBLE);
+        }
+        if (canShowOverlay && controller.isMirroring()) {
+            TouchOverlayController.start(this);
+        }
 
         statusMirroring.setText(controller.isMirroring()
                 ? R.string.status_mirroring_on : R.string.status_mirroring_off);
@@ -345,8 +368,8 @@ public final class MainActivity extends AppCompatActivity implements MirrorContr
 
         if (!canWriteSettings && controller.isMirroring()) {
             statusHint.setText(R.string.keep_awake_denied);
-        } else if (!TouchIndicatorManager.isAvailable() && controller.isMirroring()) {
-            statusHint.setText(R.string.touch_indicator_unavailable);
+        } else if (!canShowOverlay && controller.isMirroring()) {
+            statusHint.setText(R.string.touch_overlay_denied);
         } else {
             String detail = controller.getStatusText();
             statusHint.setText(detail == null || detail.isEmpty()

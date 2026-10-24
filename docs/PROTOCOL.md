@@ -41,6 +41,7 @@ watchapp 与 Android 伴侣应用通过 **AppMessage** 通信，中间由官方 
 | 14 | `REQUEST` | `CMD` | `CMD=1` 请求关键帧 |
 | 15 | `PATH` | `POINT_COUNT`, `DURATION`, `DATA` | 完整触摸折线；`DATA` 为 `count` 个 `uint16 x, uint16 y`（小端） |
 | 16 | `MODE` | `CMD` | 请求切换取景：0=竖屏视口，1=整屏缩放（长按 Select） |
+| 17 | `PREVIEW` | `CMD`, `X`, `Y` | 触摸预览（不注入）；`CMD`: 1=down, 2=move, 3=up；手机把它画进镜像帧 |
 
 ### 按键映射
 
@@ -50,6 +51,13 @@ watchapp 与 Android 伴侣应用通过 **AppMessage** 通信，中间由官方 
 - Select 双击：`KEY` `CMD=3`（最近任务）；
 - Select 长按：`MODE` 切换 0/1；
 - 返回：`KEY` `CMD=1`。
+
+### 触摸轨迹
+
+`PREVIEW` 只用于视觉反馈，不触发触摸注入；真正的手势仍由 `TAP` / `LONG` /
+`PATH` 完成。手表在按下、移动（约 50ms 节流）和抬起时发 `PREVIEW`，手机把坐标
+映射到手机屏幕后，用悬浮窗在**手机屏幕**上画黑边白点/白色轨迹；编码镜像帧前
+会擦除同一轨迹区域，避免轨迹出现在手表上。最后一个点保留约 3 秒。
 
 ### 手机 → 表
 

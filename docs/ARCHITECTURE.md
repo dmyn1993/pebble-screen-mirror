@@ -26,7 +26,8 @@
 | `MainActivity` | 录屏授权、状态、设置、Shizuku/无障碍入口 |
 | `MirrorService` | 前台服务；持有 MediaProjection、`ScreenCapture`、`LegacyPebbleLink` |
 | `ScreenTimeoutManager` | 镜像时临时把系统息屏时间设为“永不”，停止/异常退出后恢复原值 |
-| `TouchIndicatorManager` | 镜像时通过 Shizuku/Root 打开系统触摸小白点，停止后恢复原值 |
+| `TouchTrailOverlay` | 手机坐标的触摸轨迹状态，约 3 秒过期 |
+| `TouchOverlayController` / `TouchTrailView` | 手机屏幕悬浮窗画轨迹；镜像编码前擦除同一轨迹区域 |
 | `ScreenCapture` | VirtualDisplay + ImageReader；缩放；回调 ARGB 像素 |
 | `FrameEncoder` | 1-bit 抖动、LSB-first 打包、8×8 tile、帧差分 |
 | `ViewportMapper` | 视口/整屏几何、触摸坐标映射 |
@@ -74,6 +75,8 @@ MediaProjection
   → MirrorController.onWatchMessage
        ├─ HELLO → 配置/心跳
        ├─ TOUCH → TouchGesture → 坐标映射 → 注入
+       ├─ PATH → 完整轨迹注入
+       ├─ PREVIEW → TouchTrailOverlay → 手机悬浮窗（编码前擦除轨迹区域）
        ├─ PAN → 重编码当前缓存帧
        ├─ KEY → 注入返回/主页/最近任务
        └─ REQUEST → 强制关键帧

@@ -27,7 +27,9 @@ python tools/send_test_frame.py --pebble /opt/pebble-venv/bin/pebble
 ## Controls
 
 - **Touchscreen**: tap / swipe / free-form circle or S; the complete polyline
-  is replayed on the phone when the finger lifts.
+  is replayed on the phone when the finger lifts. Touch preview messages are
+  sent to the phone, which shows them as a short-lived trail on the phone
+  screen (not in the mirrored watch frame).
 - **UP / DOWN**: short press pans the viewport; long UP jumps to the top and long
   DOWN jumps to the bottom (viewport mode).
 - **SELECT**: Android Home.

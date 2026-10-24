@@ -43,6 +43,7 @@ enum {
   KIND_REQUEST = 14,
   KIND_PATH = 15,
   KIND_MODE = 16,
+  KIND_PREVIEW = 17,
 };
 
 enum {
@@ -116,6 +117,9 @@ static int s_pending_up_x;
 static int s_pending_up_y;
 static uint16_t s_pending_duration;
 static AppTimer *s_touch_retry_timer;
+static uint32_t s_preview_last_ms;
+static int s_preview_last_x;
+static int s_preview_last_y;
 
 #define MAX_PATH_POINTS 256
 static int16_t s_path_x[MAX_PATH_POINTS];
@@ -400,6 +404,25 @@ static void send_mode(uint8_t mode) {
   app_message_outbox_send();
 }
 
+// Lightweight visual-only touch sample for the phone-side trail overlay. This
+// is deliberately separate from KIND_TOUCH/KIND_PATH, which perform injection.
+static void send_preview(uint8_t action, int x, int y) {
+  s_preview_last_ms = now_ms();
+  s_preview_last_x = x;
+  s_preview_last_y = y;
+
+  DictionaryIterator *iter;
+  if (app_message_outbox_begin(&iter) != APP_MSG_OK) {
+    return;
+  }
+
+  dict_write_uint8(iter, MK_KIND, KIND_PREVIEW);
+  dict_write_uint8(iter, MK_CMD, action);
+  dict_write_uint16(iter, MK_X, x);
+  dict_write_uint16(iter, MK_Y, y);
+  app_message_outbox_send();
+}
+
 static void request_keyframe(void) {
   DictionaryIterator *iter;
   if (app_message_outbox_begin(&iter) != APP_MSG_OK) {
@@ -627,6 +650,7 @@ static void touch_handler(const TouchEvent *event, void *context) {
       s_pending_path = false;
       path_reset();
       path_add(event->x, event->y);
+      send_preview(TOUCH_DOWN, event->x, event->y);
       break;
 
     case TouchEvent_PositionUpdate: {
@@ -636,6 +660,10 @@ static void touch_handler(const TouchEvent *event, void *context) {
         s_touch_moved = true;
       }
       path_add(event->x, event->y);
+      if (iabs(event->x - s_preview_last_x) + iabs(event->y - s_preview_last_y) >= 3
+          && now_ms() - s_preview_last_ms >= 50) {
+        send_preview(TOUCH_MOVE, event->x, event->y);
+      }
       break;
     }
 
@@ -682,6 +710,7 @@ static void touch_handler(const TouchEvent *event, void *context) {
           }
         }
       }
+      send_preview(TOUCH_UP, event->x, event->y);
       s_touch_active = false;
       break;
     }

@@ -7,7 +7,6 @@ public final class MirrorApp extends Application {
     public void onCreate() {
         super.onCreate();
         ScreenTimeoutManager.restoreIfStale(this);
-        TouchIndicatorManager.restoreIfStale(this);
         MirrorController.init(this);
         NotificationHelper.ensureChannel(this);
     }
